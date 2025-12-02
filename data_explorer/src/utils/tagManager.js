@@ -1,43 +1,94 @@
+import { supabase } from '../lib/supabase';
 
-const STORAGE_KEY = 'data_explorer_tags';
-
-export const getTags = (recordId) => {
+/**
+ * 특정 레코드의 태그 가져오기
+ */
+export const getTags = async (recordId) => {
     try {
-        const allTags = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-        return allTags[recordId] || [];
-    } catch (e) {
-        console.error('Error reading tags from localStorage', e);
+        const { data, error } = await supabase
+            .from('tags')
+            .select('*')
+            .eq('record_id', recordId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return data || [];
+    } catch (error) {
+        console.error('Error fetching tags:', error);
         return [];
     }
 };
 
-export const addTag = (recordId, tag) => {
+/**
+ * 태그 추가 (익명 사용자 허용)
+ */
+export const addTag = async (recordId, tagText) => {
     try {
-        const allTags = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-        const recordTags = allTags[recordId] || [];
-        if (!recordTags.includes(tag)) {
-            allTags[recordId] = [...recordTags, tag];
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(allTags));
+        const { data, error } = await supabase
+            .from('tags')
+            .insert({
+                record_id: recordId,
+                tag_text: tagText.trim(),
+                created_by: null // 익명 사용자 허용
+            })
+            .select()
+            .single();
+
+        if (error) {
+            // 중복 태그 처리
+            if (error.code === '23505') {
+                throw new Error('Tag already exists');
+            }
+            throw error;
         }
-        return allTags[recordId];
-    } catch (e) {
-        console.error('Error adding tag to localStorage', e);
-        return [];
+
+        return data;
+    } catch (error) {
+        console.error('Error adding tag:', error);
+        throw error;
     }
 };
 
-export const removeTag = (recordId, tag) => {
+/**
+ * 태그 삭제
+ */
+export const removeTag = async (tagId) => {
     try {
-        const allTags = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-        const recordTags = allTags[recordId] || [];
-        allTags[recordId] = recordTags.filter(t => t !== tag);
-        if (allTags[recordId].length === 0) {
-            delete allTags[recordId];
-        }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(allTags));
-        return allTags[recordId] || [];
-    } catch (e) {
-        console.error('Error removing tag from localStorage', e);
-        return [];
+        const { error } = await supabase
+            .from('tags')
+            .delete()
+            .eq('id', tagId);
+
+        if (error) throw error;
+    } catch (error) {
+        console.error('Error removing tag:', error);
+        throw error;
     }
+};
+
+/**
+ * 실시간 태그 구독
+ */
+export const subscribeToTags = (recordId, callback) => {
+    const channel = supabase
+        .channel(`tags:${recordId}`)
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'tags',
+                filter: `record_id=eq.${recordId}`
+            },
+            (payload) => {
+                callback(payload);
+            }
+        )
+        .subscribe();
+
+    // 구독 해제 함수 반환
+    return () => {
+        supabase.removeChannel(channel);
+    };
 };

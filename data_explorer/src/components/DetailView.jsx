@@ -1,34 +1,70 @@
 import { X, Plus, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Tag from './Tag';
-import { addTag, removeTag, getTags } from '../utils/tagManager';
+import { addTag, removeTag, getTags, subscribeToTags } from '../utils/tagManager';
 
 const DetailView = ({ item, onClose }) => {
     const [tags, setTags] = useState([]);
     const [newTag, setNewTag] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
-        if (item) {
-            setTags(getTags(item.id));
-        }
+        if (!item) return;
+
+        // 초기 태그 로드
+        loadTags();
+
+        // 실시간 구독 시작
+        const unsubscribe = subscribeToTags(item.id, (payload) => {
+            // 실시간 업데이트 처리
+            loadTags();
+        });
+
+        return () => {
+            unsubscribe();
+        };
     }, [item]);
 
-    if (!item) return null;
-
-    const handleAddTag = (e) => {
-        e.preventDefault();
-        if (newTag.trim()) {
-            const updatedTags = addTag(item.id, newTag.trim());
-            setTags(updatedTags);
-            setNewTag('');
-            item.tags = updatedTags;
+    const loadTags = async () => {
+        try {
+            const fetchedTags = await getTags(item.id);
+            setTags(fetchedTags);
+        } catch (err) {
+            console.error('Error loading tags:', err);
         }
     };
 
-    const handleRemoveTag = (tagToRemove) => {
-        const updatedTags = removeTag(item.id, tagToRemove);
-        setTags(updatedTags);
-        item.tags = updatedTags;
+    if (!item) return null;
+
+    const handleAddTag = async (e) => {
+        e.preventDefault();
+        if (!newTag.trim()) return;
+
+        try {
+            setLoading(true);
+            setError(null);
+            await addTag(item.id, newTag.trim());
+            setNewTag('');
+            // 실시간 구독으로 자동 업데이트됨
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRemoveTag = async (tagId) => {
+        try {
+            setLoading(true);
+            setError(null);
+            await removeTag(tagId);
+            // 실시간 구독으로 자동 업데이트됨
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -135,21 +171,35 @@ const DetailView = ({ item, onClose }) => {
                         {/* Tags Section */}
                         <div>
                             <h3 style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Tags</h3>
+                            {error && (
+                                <div style={{
+                                    padding: '0.5rem',
+                                    backgroundColor: '#fee',
+                                    color: '#c00',
+                                    borderRadius: 'var(--radius-sm)',
+                                    fontSize: '0.875rem',
+                                    marginBottom: '0.5rem'
+                                }}>
+                                    {error}
+                                </div>
+                            )}
                             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
                                     {tags.map(tag => (
-                                        <div key={tag} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                            <Tag label={tag} />
+                                        <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                            <Tag label={tag.tag_text} />
                                             <button
-                                                onClick={() => handleRemoveTag(tag)}
+                                                onClick={() => handleRemoveTag(tag.id)}
+                                                disabled={loading}
                                                 style={{
                                                     background: 'none',
                                                     border: 'none',
                                                     color: 'var(--text-secondary)',
-                                                    cursor: 'pointer',
+                                                    cursor: loading ? 'not-allowed' : 'pointer',
                                                     padding: 0,
                                                     display: 'flex',
-                                                    alignItems: 'center'
+                                                    alignItems: 'center',
+                                                    opacity: loading ? 0.5 : 1
                                                 }}
                                             >
                                                 <Trash2 size={14} />
@@ -163,6 +213,7 @@ const DetailView = ({ item, onClose }) => {
                                         value={newTag}
                                         onChange={(e) => setNewTag(e.target.value)}
                                         placeholder="Add a tag..."
+                                        disabled={loading}
                                         style={{
                                             flex: 1,
                                             padding: '0.5rem',
@@ -170,21 +221,24 @@ const DetailView = ({ item, onClose }) => {
                                             border: '1px solid var(--border-color)',
                                             backgroundColor: 'var(--bg-background)',
                                             color: 'var(--text-primary)',
-                                            fontSize: '0.875rem'
+                                            fontSize: '0.875rem',
+                                            opacity: loading ? 0.5 : 1
                                         }}
                                     />
                                     <button
                                         type="submit"
+                                        disabled={loading}
                                         style={{
                                             padding: '0.5rem',
                                             borderRadius: 'var(--radius-sm)',
                                             backgroundColor: 'var(--primary)',
                                             color: 'white',
                                             border: 'none',
-                                            cursor: 'pointer',
+                                            cursor: loading ? 'not-allowed' : 'pointer',
                                             display: 'flex',
                                             alignItems: 'center',
-                                            justifyContent: 'center'
+                                            justifyContent: 'center',
+                                            opacity: loading ? 0.5 : 1
                                         }}
                                     >
                                         <Plus size={20} />
