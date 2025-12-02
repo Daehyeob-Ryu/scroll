@@ -5,11 +5,12 @@ import FilterPanel from './components/FilterPanel'
 import DataTable from './components/DataTable'
 import DetailView from './components/DetailView'
 import { loadData } from './utils/mockData'
-import { ChevronLeft, ChevronRight, Settings, Bell } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Settings, Bell, X } from 'lucide-react'
+import Tag from './components/Tag'
 
 function App() {
     const [data, setData] = useState([])
-    const [searchQuery, setSearchQuery] = useState('')
+    const [searchKeywords, setSearchKeywords] = useState([])
     const [filters, setFilters] = useState({
         org: [],
         category: [],
@@ -38,11 +39,15 @@ function App() {
     const filteredData = useMemo(() => {
         return data.filter(item => {
             // Search filter
-            const matchesSearch =
-                (item.code_display && item.code_display.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                (item.concept_name && item.concept_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                (item.code_id && item.code_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                (item.tags && item.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())));
+            const matchesSearch = searchKeywords.length === 0 || searchKeywords.every(keyword => {
+                const lowerKeyword = keyword.toLowerCase();
+                return (
+                    (item.code_display && item.code_display.toLowerCase().includes(lowerKeyword)) ||
+                    (item.concept_name && item.concept_name.toLowerCase().includes(lowerKeyword)) ||
+                    (item.code_id && item.code_id.toLowerCase().includes(lowerKeyword)) ||
+                    (item.tags && item.tags.some(tag => tag.toLowerCase().includes(lowerKeyword)))
+                );
+            });
 
             // Org filter
             const matchesOrg = filters.org.length === 0 || filters.org.includes(item.org);
@@ -55,7 +60,7 @@ function App() {
 
             return matchesSearch && matchesOrg && matchesCategory && matchesVocab;
         });
-    }, [data, searchQuery, filters]);
+    }, [data, searchKeywords, filters]);
 
     // Pagination logic
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
@@ -67,7 +72,17 @@ function App() {
     // Reset page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery, filters]);
+    }, [searchKeywords, filters]);
+
+    const handleAddKeyword = (keyword) => {
+        if (keyword && !searchKeywords.includes(keyword)) {
+            setSearchKeywords([...searchKeywords, keyword]);
+        }
+    };
+
+    const handleRemoveKeyword = (keywordToRemove) => {
+        setSearchKeywords(searchKeywords.filter(k => k !== keywordToRemove));
+    };
 
     return (
         <div style={{
@@ -98,7 +113,11 @@ function App() {
 
                 <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 2rem' }}>
                     <div style={{ width: '100%', maxWidth: '600px' }}>
-                        <SearchBar value={searchQuery} onChange={setSearchQuery} />
+                        <SearchBar
+                            onSearch={handleAddKeyword}
+                            tags={searchKeywords}
+                            onRemoveTag={handleRemoveKeyword}
+                        />
                     </div>
                 </div>
 
@@ -140,9 +159,12 @@ function App() {
                     overflowY: 'auto',
                     backgroundColor: 'var(--bg-background)'
                 }}>
-                    <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>
-                            Showing {filteredData.length.toLocaleString()} Results {searchQuery && `for '${searchQuery}'`}
+                    <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '32px' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1, marginRight: '1rem' }}>
+                            {/* Tags are now displayed in the SearchBar */}
+                        </div>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, whiteSpace: 'nowrap' }}>
+                            Showing {filteredData.length.toLocaleString()} Results
                         </h2>
                     </div>
 

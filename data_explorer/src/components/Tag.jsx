@@ -1,6 +1,8 @@
 
 
-const Tag = ({ label }) => {
+import { X } from 'lucide-react';
+
+const Tag = ({ label, onRemove, removable }) => {
     const getColors = (label) => {
         // Simple hash for consistent colors
         const colors = [
@@ -25,17 +27,47 @@ const Tag = ({ label }) => {
         <span style={{
             backgroundColor: bg,
             color: text,
-            padding: '0.25rem 0.6rem',
+            padding: '0.5rem 1rem',
             borderRadius: '9999px',
-            fontSize: '0.75rem',
-            fontWeight: 500,
+            fontSize: '0.9rem',
+            fontWeight: 600,
             display: 'inline-flex',
             alignItems: 'center',
             marginRight: '0.35rem',
             marginBottom: '0.25rem',
-            lineHeight: 1
+            lineHeight: 1,
+            gap: '0.5rem',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
         }}>
             {label}
+            {removable && (
+                <button
+                    onClick={onRemove}
+                    style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: '2px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'currentColor',
+                        opacity: 0.8,
+                        borderRadius: '50%',
+                        transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.target.style.opacity = 1;
+                        e.target.style.backgroundColor = 'rgba(0,0,0,0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.target.style.opacity = 0.8;
+                        e.target.style.backgroundColor = 'transparent';
+                    }}
+                >
+                    <X size={16} strokeWidth={2.5} />
+                </button>
+            )}
         </span>
     );
 };
