@@ -4,7 +4,8 @@ import SearchBar from './components/SearchBar'
 import FilterPanel from './components/FilterPanel'
 import DataTable from './components/DataTable'
 import DetailView from './components/DetailView'
-import { loadData } from './utils/mockData'
+import { loadRecords, searchRecords, getFilterOptions } from './utils/dataLoader'
+import { supabase } from './lib/supabase'
 import { ChevronLeft, ChevronRight, Settings, Bell, X } from 'lucide-react'
 import Tag from './components/Tag'
 
@@ -18,17 +19,27 @@ function App() {
     })
     const [selectedItem, setSelectedItem] = useState(null)
     const [currentPage, setCurrentPage] = useState(1)
+    const [loading, setLoading] = useState(true)
     const itemsPerPage = 50
 
+    // 데이터 로드
     useEffect(() => {
-        const fetchData = async () => {
-            const loadedData = await loadData();
-            setData(loadedData);
-        };
-        fetchData();
+        fetchData()
     }, [])
 
-    // Extract unique values for filters
+    const fetchData = async () => {
+        setLoading(true)
+        try {
+            const loadedData = await loadRecords()
+            setData(loadedData)
+        } catch (error) {
+            console.error('Error loading data:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // Extract unique values for filters (클라이언트 사이드)
     const filterOptions = useMemo(() => ({
         org: [...new Set(data.map(item => item.org))].sort(),
         category: [...new Set(data.map(item => item.category))].sort(),
@@ -83,6 +94,23 @@ function App() {
     const handleRemoveKeyword = (keywordToRemove) => {
         setSearchKeywords(searchKeywords.filter(k => k !== keywordToRemove));
     };
+
+    // 로딩 중
+    if (loading) {
+        return (
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100vh',
+                backgroundColor: 'var(--bg-background)'
+            }}>
+                <div style={{ textAlign: 'center' }}>
+                    <h2>Loading...</h2>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div style={{
