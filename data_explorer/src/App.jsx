@@ -5,6 +5,7 @@ import FilterPanel from './components/FilterPanel'
 import DataTable from './components/DataTable'
 import DetailView from './components/DetailView'
 import { loadRecords, searchRecords, getFilterOptions } from './utils/dataLoader'
+import { subscribeToAllTags } from './utils/tagManager'
 import { supabase } from './lib/supabase'
 import { ChevronLeft, ChevronRight, Settings, Bell, X } from 'lucide-react'
 import Tag from './components/Tag'
@@ -20,15 +21,28 @@ function App() {
     const [selectedItem, setSelectedItem] = useState(null)
     const [currentPage, setCurrentPage] = useState(1)
     const [loading, setLoading] = useState(true)
+    const [isInitialLoad, setIsInitialLoad] = useState(true)
     const itemsPerPage = 50
 
     // 데이터 로드
     useEffect(() => {
-        fetchData()
+        fetchData(true) // 초기 로드시에만 로딩 표시
     }, [])
 
-    const fetchData = async () => {
-        setLoading(true)
+    // 태그 변경 실시간 구독 (검색 결과에 반영)
+    useEffect(() => {
+        const unsubscribe = subscribeToAllTags(() => {
+            console.log('Tag changed, refreshing data silently...')
+            fetchData(false) // 백그라운드 새로고침 (로딩 없음)
+        })
+        return () => unsubscribe()
+    }, [])
+
+    const fetchData = async (showLoading = false) => {
+        // 초기 로드시에만 로딩 화면 표시
+        if (showLoading && isInitialLoad) {
+            setLoading(true)
+        }
         try {
             const loadedData = await loadRecords()
             setData(loadedData)
@@ -36,6 +50,7 @@ function App() {
             console.error('Error loading data:', error)
         } finally {
             setLoading(false)
+            setIsInitialLoad(false)
         }
     }
 
@@ -216,7 +231,13 @@ function App() {
                 </main>
             </div>
 
-            <DetailView item={selectedItem} onClose={() => setSelectedItem(null)} />
+            <DetailView
+                item={selectedItem}
+                onClose={() => {
+                    setSelectedItem(null)
+                    fetchData(false) // 백그라운드 새로고침 (로딩 없음)
+                }}
+            />
         </div>
     )
 }

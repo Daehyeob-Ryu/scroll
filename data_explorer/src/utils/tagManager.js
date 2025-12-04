@@ -92,3 +92,27 @@ export const subscribeToTags = (recordId, callback) => {
         supabase.removeChannel(channel);
     };
 };
+
+/**
+ * 전체 태그 변경 구독 (검색 결과 실시간 갱신용)
+ */
+export const subscribeToAllTags = (callback) => {
+    const channel = supabase
+        .channel('all-tags-changes')
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'tags'
+            },
+            (payload) => {
+                callback(payload);
+            }
+        )
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+};

@@ -1,7 +1,30 @@
 import { supabase } from '../lib/supabase';
 
 /**
- * Supabase에서 활성 레코드 가져오기 (전체 데이터)
+ * 모든 태그를 record_id별로 그룹화하여 가져오기
+ */
+export const loadAllTags = async () => {
+    try {
+        const { data, error } = await supabase
+            .from('tags')
+            .select('record_id, tag_text');
+
+        if (error) throw error;
+
+        // record_id별로 태그 텍스트 그룹화
+        return (data || []).reduce((acc, tag) => {
+            if (!acc[tag.record_id]) acc[tag.record_id] = [];
+            acc[tag.record_id].push(tag.tag_text);
+            return acc;
+        }, {});
+    } catch (error) {
+        console.error('Error loading tags:', error);
+        return {};
+    }
+};
+
+/**
+ * Supabase에서 활성 레코드 가져오기 (전체 데이터 + 태그)
  */
 export const loadRecords = async () => {
     try {
@@ -38,7 +61,12 @@ export const loadRecords = async () => {
 
         console.log(`✅ Total loaded records: ${allRecords.length}`);
 
-        // 데이터 형식 변환 (기존 앱 형식과 호환)
+        // 모든 태그 로드
+        console.log('Loading tags...');
+        const recordTags = await loadAllTags();
+        console.log(`✅ Tags loaded for ${Object.keys(recordTags).length} records`);
+
+        // 데이터 형식 변환 (태그 포함)
         return allRecords.map(record => ({
             id: record.id,
             code_id: record.code_id,
@@ -49,7 +77,7 @@ export const loadRecords = async () => {
             category: record.category,
             vocab: record.vocab,
             count: record.count,
-            tags: [] // 태그는 DetailView에서 별도로 로드
+            tags: recordTags[record.id] || []
         }));
     } catch (error) {
         console.error('Error loading records:', error);

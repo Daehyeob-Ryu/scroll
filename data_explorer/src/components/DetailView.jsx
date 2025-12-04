@@ -41,13 +41,29 @@ const DetailView = ({ item, onClose }) => {
         e.preventDefault();
         if (!newTag.trim()) return;
 
+        const tagText = newTag.trim();
+
+        // Optimistic UI update: 즉시 UI에 추가
+        const tempTag = {
+            id: `temp-${Date.now()}`,
+            tag_text: tagText,
+            record_id: item.id,
+            created_at: new Date().toISOString()
+        };
+        setTags(prevTags => [tempTag, ...prevTags]);
+        setNewTag('');
+
         try {
             setLoading(true);
             setError(null);
-            await addTag(item.id, newTag.trim());
-            setNewTag('');
-            // 실시간 구독으로 자동 업데이트됨
+            const savedTag = await addTag(item.id, tagText);
+            // 임시 태그를 실제 태그로 교체
+            setTags(prevTags =>
+                prevTags.map(t => t.id === tempTag.id ? savedTag : t)
+            );
         } catch (err) {
+            // 에러 시 롤백
+            setTags(prevTags => prevTags.filter(t => t.id !== tempTag.id));
             setError(err.message);
         } finally {
             setLoading(false);
@@ -55,12 +71,19 @@ const DetailView = ({ item, onClose }) => {
     };
 
     const handleRemoveTag = async (tagId) => {
+        // Optimistic UI update: 즉시 UI에서 제거
+        const tagToRemove = tags.find(t => t.id === tagId);
+        setTags(prevTags => prevTags.filter(t => t.id !== tagId));
+
         try {
             setLoading(true);
             setError(null);
             await removeTag(tagId);
-            // 실시간 구독으로 자동 업데이트됨
         } catch (err) {
+            // 에러 시 롤백
+            if (tagToRemove) {
+                setTags(prevTags => [...prevTags, tagToRemove]);
+            }
             setError(err.message);
         } finally {
             setLoading(false);
